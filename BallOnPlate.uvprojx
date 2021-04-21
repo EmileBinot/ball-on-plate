@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath></IncludePath>
+              <IncludePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\PID_Controller-master</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -387,6 +387,16 @@
           <GroupName>:STM32CubeMX:Common Sources</GroupName>
           <Files>
             <File>
+              <FileName>pid_controller.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\PID_Controller-master\C\pid_controller.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid_controller.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\PID_Controller-master\C\pid_controller.h</FilePath>
+            </File>
+            <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\Src\main.c</FilePath>
@@ -402,6 +412,9 @@
               <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\Src\stm32f4xx_it.c</FilePath>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>New Group</GroupName>
         </Group>
         <Group>
           <GroupName>::CMSIS</GroupName>

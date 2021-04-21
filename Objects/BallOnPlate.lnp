@@ -1,4 +1,5 @@
 --cpu=Cortex-M4.fp.sp
+".\objects\pid_controller.o"
 ".\objects\main.o"
 ".\objects\stm32f4xx_it.o"
 ".\objects\stm32f4xx_hal.o"

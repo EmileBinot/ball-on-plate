@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 #include <String.h>
 #include <stdio.h>
+#include "../PID_Controller-master/C/pid_controller.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,8 +48,26 @@ TIM_HandleTypeDef htim6;
 USART_HandleTypeDef husart2;
 
 /* USER CODE BEGIN PV */
+//______________________________________________________________
+// Touchscreen variables
+double X_touch, Y_touch, X_last, Y_last;
+//______________________________________________________________
+// UART
+char txdata[50];
+//______________________________________________________________
+// PID
+float SampleTime=1;
 
+float Kpx = 0.31;  //Kpx = 0.35;	//Proportional (P)                                                   
+float Kix = 0.02;  //Kix = 0.03	//Integral (I)                                                     
+float Kdx = 0.10;  //Kdx = 0.13;	//Derivative (D)
 
+float Kpy = 0.33;  //Kpy = 0.35;                                                       
+float Kiy = 0.02;  //Kiy = 0.08;                                                      
+float Kdy = 0.11;  //Kdy = 0.13;
+
+PIDControl PIDx;
+PIDControl PIDy;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -97,7 +116,13 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+	
+	// Touchscreen init
+  Touch_Init();
+	
+	// PID init
+	//PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-);
+	
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -105,23 +130,19 @@ int main(void)
   MX_TIM4_Init();
   MX_USART2_Init();
   MX_TIM6_Init();
+	
   /* USER CODE BEGIN 2 */
-	//setup touch
-  Touch_Init();
-	double X_touch, Y_touch, X_last, Y_last;
-	char txdata[50];
 	
-	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1);
-	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2);
-	HAL_TIM_Base_Start_IT(&htim6);
+
+
+	// Starting motor's PWMs
+	TIM4->CCR1=4500; 	// Make Plate flat in X-Direction (V1)
+	TIM4->CCR2=4750; // Make Plate flat in Y-Direction (V1)
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
 	
-	TIM4->CCR1=4500;// Make Plate flat in X-Direction
-	TIM4->CCR2=4750;// Make Plate flat in Y-Direction
-	
-	TIM4->CCR1=4000;//0° level x
-	TIM4->CCR2=5000;//0° level y
-	
-	// TIM6->ARR (auto-reload value) = 8399 => 1 second period counting with 10 000-1 prescaler
+	// Start Compute/Position update IT
+	HAL_TIM_Base_Start_IT(&htim6);// Starting motor position update timer IT
 	
   /* USER CODE END 2 */
 
@@ -129,13 +150,16 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		read_touch_cal(&X_touch, &Y_touch);
-	  X_last = X_touch;
+		//#### TOUCHSCREEN ####
+		read_touch_cal(&X_touch, &Y_touch); // Read ADC
+	  X_last = X_touch; // Keep them for later
 	  Y_last = Y_touch;
+
+		//#### PID ####
 		
-		sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch);
-		
-		HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY);
+		//#### USART ####
+		sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
+		HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -354,11 +378,12 @@ static void MX_GPIO_Init(void)
 // Timers IT Callback : 
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	int prod;
-	if (htim == &htim6){
+	
+	if (htim == &htim6){	//timer 6 full triggers IT then change motor position
+			int prod;	
 			prod = TIM4->CCR1;
-			TIM4->CCR1=TIM4->CCR2;//0° level x
-			TIM4->CCR2=prod;//0° level y
+			TIM4->CCR1=TIM4->CCR2;
+			TIM4->CCR2=prod;
 			
 			HAL_GPIO_TogglePin(BUILT_IN_LED_GPIO_Port, BUILT_IN_LED_Pin);
 	}
