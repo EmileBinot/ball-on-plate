@@ -49,6 +49,10 @@ USART_HandleTypeDef husart2;
 
 /* USER CODE BEGIN PV */
 //______________________________________________________________
+// Motors
+int flat_X =4500;
+int flat_Y =4750;
+//______________________________________________________________
 // Touchscreen variables
 double X_touch, Y_touch, X_last, Y_last;
 //______________________________________________________________
@@ -56,15 +60,15 @@ double X_touch, Y_touch, X_last, Y_last;
 char txdata[50];
 //______________________________________________________________
 // PID
-float SampleTime=0.1;// Will also change the timer IT Arr
+float SampleTime=0.05;// Will also change the timer IT Arr
 
-float Kpx = 0.31;  //Kpx = 0.35;	//Proportional (P)                                                   
-float Kix = 0.02;  //Kix = 0.03	//Integral (I)                                                     
-float Kdx = 0.10;  //Kdx = 0.13;	//Derivative (D)
+float Kpx = 3.5;  //Kpx = 0.35;	//Proportional (P)                                                   
+float Kix = 0.3;  //Kix = 0.03	//Integral (I)                                                     
+float Kdx = 1.3;  //Kdx = 0.13;	//Derivative (D)
 
-float Kpy = 0.33;  //Kpy = 0.35;                                                       
-float Kiy = 0.02;  //Kiy = 0.08;                                                      
-float Kdy = 0.11;  //Kdy = 0.13;
+float Kpy = 3.5;  //Kpy = 0.35;                                                       
+float Kiy = 0.8;  //Kiy = 0.08;                                                      
+float Kdy = 1.3;  //Kdy = 0.13;
 
 PIDControl PIDx;
 PIDControl PIDy;
@@ -121,9 +125,10 @@ int main(void)
   Touch_Init();
 	
 	// PID init
-	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-100,+100,AUTOMATIC,REVERSE);
-	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime,-100,+100,AUTOMATIC,DIRECT);
+	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-1500,+1500,AUTOMATIC,REVERSE);
+	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime,-1000,+1000,AUTOMATIC,DIRECT);
 	PIDSetpointSet(&PIDx,0.0);
+	PIDSetpointSet(&PIDy,0.0);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -137,8 +142,8 @@ int main(void)
 
 
 	// Starting motor's PWMs
-	TIM4->CCR1=4500; 	// Make Plate flat in X-Direction (V1)
-	TIM4->CCR2=4750; // Make Plate flat in Y-Direction (V1)
+	TIM4->CCR1=flat_X; 	// Make Plate flat in X-Direction (V1)
+	TIM4->CCR2=flat_Y; // Make Plate flat in Y-Direction (V1)
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
 	
@@ -153,12 +158,11 @@ int main(void)
   {
 		//#### TOUCHSCREEN ####
 		read_touch_cal(&X_touch, &Y_touch); // Read ADC
-	  X_last = X_touch; // Keep them for later
-	  Y_last = Y_touch;
 
 		//#### PID ####
 		PIDInputSet(&PIDx,X_touch);
 		PIDInputSet(&PIDy,Y_touch);
+		
 		//#### USART ####
 		//sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
 		//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
@@ -383,21 +387,22 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	
 	if (htim == &htim6){	//timer 6 full triggers IT then change motor position
 			int PIDx_out,PIDy_out;
-		/*int prod;	
-			prod = TIM4->CCR1;
-			TIM4->CCR1=TIM4->CCR2;
-			TIM4->CCR2=prod;*/
+
 			PIDInputSet(&PIDx,X_touch);
 			PIDInputSet(&PIDy,Y_touch);
+		
 			PIDCompute(&PIDx);
 			PIDCompute(&PIDy);
+		
 			PIDx_out=(int)PIDOutputGet(&PIDx);	
 			PIDy_out=(int)PIDOutputGet(&PIDy);	
-			TIM4->CCR1=4500+PIDx_out*30;
-			TIM4->CCR2=4750+PIDy_out*30;
+		
+			TIM4->CCR1=flat_X+PIDx_out;
+			TIM4->CCR2=flat_Y+PIDy_out;
 		
 			HAL_GPIO_TogglePin(BUILT_IN_LED_GPIO_Port, BUILT_IN_LED_Pin);
-			sprintf(txdata,"x=%f, PIDx=%d, PIDx=%d\n\r",X_touch,PIDx_out,PIDy_out); // Fill up the buffer we're gonna send to PC
+			//sprintf(txdata,"x:%f,y:%f,PIDx:%d,PIDy:%d\n\r",X_touch,Y_touch,PIDx_out,PIDy_out); // Fill up the buffer we're gonna send to PC
+			sprintf(txdata,"x:%f,PIDx:%d\n\r",X_touch,PIDx_out);	
 			HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
 	}
 }
@@ -427,7 +432,7 @@ void Touch_Init(void){
 	  //turn ADC1 on and set EOCS to regular conversion
 	  ADC1->CR2 |= ADC_CR2_ADON |  ADC_CR2_EOCS;
 	  //set shortest sample time
-	  ADC1->SMPR1 |= 0x11;
+	  ADC1->SMPR1 |= 0x09;
 	  //set resution to 10 bit
 	  ADC1->CR1 = (ADC1->CR1 & ~(ADC_CR1_RES)) | ADC_CR1_RES_0;
 }
@@ -476,7 +481,7 @@ uint16_t read_touchX(void){
 		adcs[number] = ADC1->DR;
 	}
 
-	uint16_t med = median(5, adcs)/*/(1024/Xresolution)*/;
+	uint16_t med = median(5, adcs);
 	return med;
 }
 
@@ -504,20 +509,21 @@ uint16_t read_touchY(void){
 		}
 		adcs[number] = ADC1->DR;
 	}
-	//printf("%d\r\n", median(5, adcs));
-	//cut off at 120
-	uint16_t med = median(5, adcs)/*/(1024/Xresolution)*/;
-	/*if (med < 120){
-		return 5000;
-	}*/
 
-	//return (med * 0.31) - 41; 	//return result
+	uint16_t med = median(5, adcs);
+
+	
 	return med;
 }
 
 //#### Formatting read values ####
 uint8_t read_touch_cal (double *Xpos, double *Ypos){
 	double x,y;
+	double last_x,last_y;
+	static double xtab[3];
+	static double ytab[3];
+	static double bufx[3];
+	static double bufy[3];
 	
 	static double xmin = 90.0;
 	static double xmax = 939.0;
@@ -535,19 +541,33 @@ uint8_t read_touch_cal (double *Xpos, double *Ypos){
 	x=read_touchX();
 	y=read_touchY();
 	
+	if(x<10 || y<10){
+		*Xpos = 0;
+		*Ypos = 0;
+		return 1;
+	}
+	
 	//we do so x and y are roughly within [-100;100] range 
 	x = (x - xmin - xm) * convertX;
 	y = (y - ymin - ym) * convertY;
-	
-	if(y<-75 || x<-102 || y>85){
-		x=0.0;
-		y=0.0;
+
+	if(y>-80 && x>-110 && y<90 ){
+		
+		*Xpos = x;
+		*Ypos = y;
+		last_x = x;
+		last_y = y;
+		
 	}
 	
-	*Xpos = x;
-	*Ypos = y;
+	else{
+		*Xpos = last_x;
+		*Ypos = last_y;
+	}
+
 	return 1;
 }
+
 /* USER CODE END 4 */
 
 /**
