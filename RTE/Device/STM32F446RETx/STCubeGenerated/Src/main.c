@@ -56,7 +56,7 @@ double X_touch, Y_touch, X_last, Y_last;
 char txdata[50];
 //______________________________________________________________
 // PID
-float SampleTime=1;
+float SampleTime=0.1;// Will also change the timer IT Arr
 
 float Kpx = 0.31;  //Kpx = 0.35;	//Proportional (P)                                                   
 float Kix = 0.02;  //Kix = 0.03	//Integral (I)                                                     
@@ -121,8 +121,9 @@ int main(void)
   Touch_Init();
 	
 	// PID init
-	//PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-);
-	
+	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-100,+100,AUTOMATIC,REVERSE);
+	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime,-100,+100,AUTOMATIC,DIRECT);
+	PIDSetpointSet(&PIDx,0.0);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -156,10 +157,11 @@ int main(void)
 	  Y_last = Y_touch;
 
 		//#### PID ####
-		
+		PIDInputSet(&PIDx,X_touch);
+		PIDInputSet(&PIDy,Y_touch);
 		//#### USART ####
-		sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
-		HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+		//sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
+		//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -295,7 +297,7 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 10000-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 8400-1;
+  htim6.Init.Period = (SampleTime*8400)-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
@@ -380,12 +382,23 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	
 	if (htim == &htim6){	//timer 6 full triggers IT then change motor position
-			int prod;	
+			int PIDx_out,PIDy_out;
+		/*int prod;	
 			prod = TIM4->CCR1;
 			TIM4->CCR1=TIM4->CCR2;
-			TIM4->CCR2=prod;
-			
+			TIM4->CCR2=prod;*/
+			PIDInputSet(&PIDx,X_touch);
+			PIDInputSet(&PIDy,Y_touch);
+			PIDCompute(&PIDx);
+			PIDCompute(&PIDy);
+			PIDx_out=(int)PIDOutputGet(&PIDx);	
+			PIDy_out=(int)PIDOutputGet(&PIDy);	
+			TIM4->CCR1=4500+PIDx_out*30;
+			TIM4->CCR2=4750+PIDy_out*30;
+		
 			HAL_GPIO_TogglePin(BUILT_IN_LED_GPIO_Port, BUILT_IN_LED_Pin);
+			sprintf(txdata,"x=%f, PIDx=%d, PIDx=%d\n\r",X_touch,PIDx_out,PIDy_out); // Fill up the buffer we're gonna send to PC
+			HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
 	}
 }
 

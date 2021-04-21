@@ -222,4 +222,14 @@ PIDSampleTimeSet(PIDControl *pid, float sampleTimeSeconds)
     }
 }
 
+void 
+PIDSetpointSet(PIDControl *pid, float setpoint) { pid->setpoint = setpoint; }
+
+
+void 
+PIDInputSet(PIDControl *pid, float input) { pid->input = input; }
+
+
+float 
+PIDOutputGet(PIDControl *pid) { return pid->output; }
 
