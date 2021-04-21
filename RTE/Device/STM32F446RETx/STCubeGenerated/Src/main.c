@@ -42,6 +42,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim6;
 
 USART_HandleTypeDef husart2;
 
@@ -55,6 +56,7 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART2_Init(void);
+static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 //______________________________________________________________
@@ -102,6 +104,7 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM4_Init();
   MX_USART2_Init();
+  MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	//setup touch
   Touch_Init();
@@ -110,11 +113,19 @@ int main(void)
 	
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2);
-	TIM4->CCR1=20000;
-	TIM4->CCR2=40000;
+	HAL_TIM_Base_Start_IT(&htim6);
+	
+	TIM4->CCR1=4500;// Make Plate flat in X-Direction
+	TIM4->CCR2=4750;// Make Plate flat in Y-Direction
+	
+	TIM4->CCR1=4000;//0° level x
+	TIM4->CCR2=5000;//0° level y
+	
+	// TIM6->ARR (auto-reload value) = 8399 => 1 second period counting with 10 000-1 prescaler
+	
   /* USER CODE END 2 */
 
-  /* Infinite loop */
+  /* Infinite loop   */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
@@ -123,7 +134,6 @@ int main(void)
 	  Y_last = Y_touch;
 		
 		sprintf(txdata,"x=%f, y=%f\n\r",X_touch,Y_touch);
-		
 		
 		HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY);
     /* USER CODE END WHILE */
@@ -242,6 +252,44 @@ static void MX_TIM4_Init(void)
 }
 
 /**
+  * @brief TIM6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM6_Init(void)
+{
+
+  /* USER CODE BEGIN TIM6_Init 0 */
+
+  /* USER CODE END TIM6_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM6_Init 1 */
+
+  /* USER CODE END TIM6_Init 1 */
+  htim6.Instance = TIM6;
+  htim6.Init.Prescaler = 10000-1;
+  htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim6.Init.Period = 8400-1;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim6, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM6_Init 2 */
+
+  /* USER CODE END TIM6_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -282,14 +330,41 @@ static void MX_USART2_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(BUILT_IN_LED_GPIO_Port, BUILT_IN_LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : BUILT_IN_LED_Pin */
+  GPIO_InitStruct.Pin = BUILT_IN_LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(BUILT_IN_LED_GPIO_Port, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
+
+//______________________________________________________________
+// Timers IT Callback : 
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	int prod;
+	if (htim == &htim6){
+			prod = TIM4->CCR1;
+			TIM4->CCR1=TIM4->CCR2;//0° level x
+			TIM4->CCR2=prod;//0° level y
+			
+			HAL_GPIO_TogglePin(BUILT_IN_LED_GPIO_Port, BUILT_IN_LED_Pin);
+	}
+}
+
+
 //______________________________________________________________
 // Definitions of TOUCHSCREEN FUNCTIONS : 
 
