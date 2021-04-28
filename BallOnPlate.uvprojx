@@ -313,7 +313,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>2</Optim>
+            <Optim>1</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -386,16 +386,6 @@
         <Group>
           <GroupName>:STM32CubeMX:Common Sources</GroupName>
           <Files>
-            <File>
-              <FileName>pid_controller.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\PID_Controller-master\C\pid_controller.c</FilePath>
-            </File>
-            <File>
-              <FileName>pid_controller.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\RTE\Device\STM32F446RETx\STCubeGenerated\PID_Controller-master\C\pid_controller.h</FilePath>
-            </File>
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
