@@ -67,18 +67,24 @@ char txdata[100];
 // PID
 double SampleTime=0.005;// Will also change the timer IT Arr
 
-float Kpx = 3;  //Kpx = 0.35;	//Proportional (P)                                                   
-float Kix = 0.3;  //Kix = 0.03	//Integral (I)                                                     
-float Kdx = 3.3;  //Kdx = 0.13;	//Derivative (D)
+float Kpx = 4;  //Kpx = 3;	//Proportional (P)                                                   
+float Kix = 3; //Kix = 2	//Integral (I)                                                     
+float Kdx = 1.2;  //Kdx = 1.1;	//Derivative (D)
 
-float Kpy = 5.5;  //Kpy = 0.35;                                                       
-float Kiy = 0.8;  //Kiy = 0.08;                                                      
-float Kdy = 2.3;  //Kdy = 0.13;
+float Kpy = 3;  //Kpy = 3;                                                       
+float Kiy = 2;  //Kiy = 2;                                                      
+float Kdy = 1;  //Kdy = 1.1;
 
 PIDControl PIDx;
 PIDControl PIDy;
 
 bool PidFlag=false;
+int PIDcount=0;
+int pidxval;
+double rkglobal;
+
+int statex=0;
+int statey=0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -137,8 +143,8 @@ int main(void)
   Touch_Init();
 	
 	// PID init
-	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime,-1500,+1500,AUTOMATIC,REVERSE);
-	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime,-1000,+1000,AUTOMATIC,DIRECT);
+	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime*12,-1000,+1000,AUTOMATIC,DIRECT);
+	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime*12,-1000,+1000,AUTOMATIC,REVERSE);
 	PIDSetpointSet(&PIDx,0.0);
 	PIDSetpointSet(&PIDy,0.0);
   /* USER CODE END SysInit */
@@ -152,10 +158,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 	// Starting motor's PWMs
-	TIM4->CCR1=flat_X; 	// Make Plate flat in X-Direction (V1)
-	TIM4->CCR2=flat_Y; // Make Plate flat in Y-Direction (V1)
+	TIM4->CCR1=flat_X-250; 	// Make Plate flat in X-Direction (V1)
+	TIM4->CCR2=flat_Y+250; // Make Plate flat in Y-Direction (V1)
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
+	HAL_Delay(2000);
 	
 	// Start Compute/Position update IT
 	HAL_TIM_Base_Start_IT(&htim6);// Starting motor position update timer IT
@@ -169,13 +176,32 @@ int main(void)
 		
 		if(PidFlag==true){
 			read_touch_cal(&X_touch, &Y_touch);	
-			
-			sprintf(txdata,"%f, %f\r\n",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
-			HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+			PIDcount++;
 			
 			X_touch_last=X_touch;
 			Y_touch_last=Y_touch;
-			PidFlag=false;
+			
+			if((PIDcount>12) && ((statex==1) || (statey==1))){
+				PIDcount=0;
+				
+				sprintf(txdata,"%f, %f\r\n",X_touch,unfiltered); // Fill up the buffer we're gonna send to PC
+				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+				
+				PidFlag=false;
+				PIDcount=0;
+				
+				PIDInputSet(&PIDx,X_touch);
+				PIDInputSet(&PIDy,Y_touch);
+			
+				PIDCompute(&PIDx);
+				PIDCompute(&PIDy);
+				
+				pidxval=(int)PIDOutputGet(&PIDx);
+				
+				TIM4->CCR1=flat_X-250+(int)PIDOutputGet(&PIDx);//*1.5
+				TIM4->CCR2=flat_Y+250+(int)PIDOutputGet(&PIDy);
+			}
+
 		}
 		
 		//#### TOUCHSCREEN ####
@@ -573,12 +599,15 @@ uint8_t read_touch_cal (double *Xpos, double *Ypos){
 	mesX=read_touchX();
 	mesY=read_touchY();
 	
-	unfiltered = mesX;
+
+	//unfiltered = (mesY - xmin - xm) * convertY;
 	
 	mesX = ADCfilterX(mesX,lastmesX);
 	mesY = ADCfilterY(mesY,lastmesY);
+	unfiltered = (unfiltered - xmin - xm) * convertX;
 	//*Xpos=mesX;
 	//*Ypos=mesY;
+	
 	*Xpos= (mesX - xmin - xm) * convertX;
 	*Ypos= (mesY - ymin - ym) * convertY;
 	
@@ -591,55 +620,107 @@ uint8_t read_touch_cal (double *Xpos, double *Ypos){
 double ADCfilterX(double current,double last){
 	static bool LPfilter=false;
 	static int i=0;
-	static int state=0;
+
 	static int j=0;
 
+	//LP filter
 	double filtered;
-	static double lastfiltered;
-	double alpha = 0.3;
-	double gain = .5;
+	double alpha = 0.001;
 	
-	if(state==1){//ball on plate
+	//-------------ABG filter
+	double a=0.5;
+	double b=0.03;
+	double g=1;
+	double dt=SampleTime;
+
+	//init speed and acceleration to 0
+	static double abgfiltvx=0;
+	static double abgfiltax=0;
+	static double abgfiltvxlast=0;
+	static double abgfiltaxlast=0;
+	//position variables
+	static double abgfiltx=0;
+	static double abgfiltxlast=0;	
+	static double rk=0;
+	
+	if(statex==1){//ball on plate
 			j++;
 			filtered = current;
 			if(current<(80)){
 				i++;
 				if(i>10){
-					state=0;
+					statex=0;
+					//re-init
+					abgfiltvx=0;
+					abgfiltax=0;
+					abgfiltvxlast=0;
+					abgfiltaxlast=0;
+
+					abgfiltx=0;
+					abgfiltxlast=0;	
+					rk=0;
 				}
 			}
 			else{
 				i=0;
 			}
 	}
-	if(state==0){//no ball on plate
+	if(statex==0){//no ball on plate
 		i=0;
 		j=0;
 		filtered = current;
 		if (current >(80)){//if position different than zero
-			state=1;
+			statex=1;
 		}
 	}
-	if(j>10 && state==1){
+	if(j>10 && statex==1){
 		LPfilter=true;
-		if((current<80)||(fabs(last-current)>300)){
-			filtered=last;
-			filtered = alpha*(filtered+gain*(filtered-lastfiltered)) + (1-alpha)*lastfiltered;
+		
+		//ALPHA-BETA-GAMMA FILTER
+		abgfiltx = abgfiltxlast+dt*abgfiltvxlast+(pow(dt,2)/2)*abgfiltaxlast;
+    abgfiltvx = abgfiltvxlast+dt*abgfiltaxlast;
+    abgfiltax = abgfiltvxlast;
+		
+		rk=current-abgfiltx;
+
+		if(rk<-170){
+			//sprintf(txdata,"PROBLEMy\r\n"); // Fill up the buffer we're gonna send to PC
+			//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+			
+      abgfiltx=abgfiltx;
+      abgfiltvx=abgfiltvx;
+      abgfiltax=abgfiltax;
 		}
 		else{
-			filtered = alpha*(current+gain*(current-lastfiltered)) + (1-alpha)*lastfiltered;
-			last=filtered;
+			abgfiltx=abgfiltx+a*rk;
+      abgfiltvx=abgfiltvx+(b/dt)*rk;
+      abgfiltax=abgfiltax+(g/dt)*rk;
 		}
+		unfiltered=abgfiltx;
+		//LP FILTER
+		filtered=alpha*abgfiltxlast+(1-alpha)*abgfiltxlast;
 		
+		abgfiltxlast = abgfiltx;
+		abgfiltvxlast = abgfiltvx;
+		abgfiltaxlast = abgfiltax;
+		
+
 	}
 	else{
 		LPfilter=false;
+		
+		abgfiltx=current;
+		abgfiltxlast=last;	
+		
+		filtered=current;
+		
 		last=current;
 	}
+
 	
-	//sprintf(txdata,"%f\r\n",(fabs(last-current))); // Fill up the buffer we're gonna send to PC
-	//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-	lastfiltered = filtered;
+	
+	rkglobal=rk;
+
 	return filtered;
 }
 
@@ -647,54 +728,89 @@ double ADCfilterX(double current,double last){
 double ADCfilterY(double current,double last){
 	static bool LPfilter=false;
 	static int i=0;
-	static int state=0;
 	static int j=0;
 
+	//LP filter
 	double filtered;
 	static double lastfiltered;
 	double alpha = 0.3;
 	double gain = .5;
 	
-	if(state==1){//ball on plate
+	//-------------ABG filter
+	double a=0.5;
+	double b=0.03;
+	double g=1;
+	double dt=SampleTime;
+
+	//init speed and acceleration to 0
+	static double abgfiltvy=0;
+	static double abgfiltay=0;
+	static double abgfiltvylast=0;
+	static double abgfiltaylast=0;
+	//position variables
+	static double abgfilty=0;
+	static double abgfiltylast=0;	
+	static double rk=0;
+	
+	if(statey==1){//ball on plate
 			j++;
 			filtered = current;
 			if(current<(80)){
 				i++;
 				if(i>10){
-					state=0;
+					statey=0;
 				}
 			}
 			else{
 				i=0;
 			}
 	}
-	if(state==0){//no ball on plate
+	if(statey==0){//no ball on plate
 		i=0;
 		j=0;
 		filtered = current;
 		if (current >(80)){//if position different than zero
-			state=1;
+			statey=1;
 		}
 	}
-	if(j>10 && state==1){
+	if(j>10 && statey==1){
 		LPfilter=true;
-		if((current<80)||(fabs(last-current)>300)){
-			filtered=last;
-			filtered = alpha*(filtered+gain*(filtered-lastfiltered)) + (1-alpha)*lastfiltered;
+		
+		//ALPHA-BETA-GAMMA FILTER
+		abgfilty = abgfiltylast+dt*abgfiltvylast+(pow(dt,2)/2)*abgfiltaylast;
+    abgfiltvy = abgfiltvylast+dt*abgfiltaylast;
+    abgfiltay = abgfiltvylast;
+		
+		rk=current-abgfilty;
+		
+		if(rk<-170){
+			//sprintf(txdata,"PROBLEMx\r\n"); // Fill up the buffer we're gonna send to PC
+			//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+			
+      abgfilty=abgfilty;
+      abgfiltvy=abgfiltvy;
+      abgfiltay=abgfiltay;
 		}
 		else{
-			filtered = alpha*(current+gain*(current-lastfiltered)) + (1-alpha)*lastfiltered;
-			last=filtered;
+			abgfilty=abgfilty+a*rk;
+      abgfiltvy=abgfiltvy+(b/dt)*rk;
+      abgfiltay=abgfiltay+(g/dt)*rk;
 		}
-		
 	}
 	else{
 		LPfilter=false;
+		
+		abgfilty=current;
+		abgfiltylast=last;	
+		
 		last=current;
 	}
-	
-	lastfiltered = filtered;
-	return filtered;
+	//sprintf(txdata,"%f\r\n",(fabs(last-current))); // Fill up the buffer we're gonna send to PC
+	//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+	abgfiltylast = abgfilty;
+	abgfiltvylast = abgfiltvy;
+	abgfiltaylast = abgfiltay;
+	return abgfilty;
 }
 
 /* USER CODE END 4 */
