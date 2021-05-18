@@ -71,9 +71,9 @@ float Kpx = 4;  //Kpx = 3;	//Proportional (P)
 float Kix = 3; //Kix = 2	//Integral (I)                                                     
 float Kdx = 1.2;  //Kdx = 1.1;	//Derivative (D)
 
-float Kpy = 3;  //Kpy = 3;                                                       
-float Kiy = 2;  //Kiy = 2;                                                      
-float Kdy = 1;  //Kdy = 1.1;
+float Kpy = 4;  //Kpy = 3;                                                       
+float Kiy = 3;  //Kiy = 2;                                                      
+float Kdy = 0.8;  //Kdy = 1.1;
 
 PIDControl PIDx;
 PIDControl PIDy;
@@ -122,7 +122,7 @@ double ADCfilterY(double current,double last);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+	int STABLE=0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -158,8 +158,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 	// Starting motor's PWMs
-	TIM4->CCR1=flat_X-250; 	// Make Plate flat in X-Direction (V1)
-	TIM4->CCR2=flat_Y+250; // Make Plate flat in Y-Direction (V1)
+	TIM4->CCR1=flat_X; 	// Make Plate flat in X-Direction (V1)
+	TIM4->CCR2=flat_Y; // Make Plate flat in Y-Direction (V1)
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
 	HAL_Delay(2000);
@@ -181,10 +181,10 @@ int main(void)
 			X_touch_last=X_touch;
 			Y_touch_last=Y_touch;
 			
-			if((PIDcount>12) && ((statex==1) || (statey==1))){
+			if((PIDcount>12)/* && (STABLE<80)*/ &&((statex==1) || (statey==1))){//BALL ON PLATE && PID TIMER READY
 				PIDcount=0;
 				
-				sprintf(txdata,"%f, %f\r\n",X_touch,unfiltered); // Fill up the buffer we're gonna send to PC
+				sprintf(txdata,"%f, %f\r\n",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
 				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
 				
 				PidFlag=false;
@@ -198,49 +198,28 @@ int main(void)
 				
 				pidxval=(int)PIDOutputGet(&PIDx);
 				
-				TIM4->CCR1=flat_X-250+(int)PIDOutputGet(&PIDx);//*1.5
+				TIM4->CCR1=flat_X-250+(int)PIDOutputGet(&PIDx);
 				TIM4->CCR2=flat_Y+250+(int)PIDOutputGet(&PIDy);
+				
+				/*if((X_touch>-20) && (X_touch<20) && (Y_touch>-15) && (Y_touch<15)){
+					STABLE++;
+				}*/
 			}
+			/*if(STABLE>=80){
+				sprintf(txdata,"STABLE\r\n"); // Fill up the buffer we're gonna send to PC
+				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+				if((X_touch<-20) || (X_touch>20) || (Y_touch<-15) || (Y_touch>15)){
+					STABLE--;
+					TIM4->CCR1=flat_X;
+					TIM4->CCR2=flat_Y;
+				}
+			}
+			if((X_touch<-30) || (X_touch>30) || (Y_touch<-25) || (Y_touch>25)){
+					STABLE=0;
+			}*/
+			
 
 		}
-		
-		//#### TOUCHSCREEN ####
-		/*read_touch_cal(&X_touch, &Y_touch); // Read ADC
-		while((X_touch<-105)&&(Y_touch<-80)){//while ball is not on plate
-			read_touch_cal(&X_touch, &Y_touch); // Read ADC
-			TIM4->CCR1=flat_X;
-			TIM4->CCR2=flat_Y;
-			Xfiltered=0.0;
-			Yfiltered=0.0;
-			sprintf(txdata,"%f, %f\r\n",Xfiltered,Yfiltered); // Fill up the buffer we're gonna send to PC
-		  HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-		}
-		while((X_touch>-105)&&(Y_touch>-80)){//while ball is on plate*/
-/*
-		if(PidFlag==true){
-				read_touch_cal(&X_touch, &Y_touch);	
-				Xfiltered=X_touch;
-				Yfiltered=Y_touch;
-				
-				PIDInputSet(&PIDx,Xfiltered);
-				PIDInputSet(&PIDy,Yfiltered);
-			
-				PIDCompute(&PIDx);
-				PIDCompute(&PIDy);
-		
-				TIM4->CCR1=flat_X+(int)PIDOutputGet(&PIDx)*1.5;
-				TIM4->CCR2=flat_Y+(int)PIDOutputGet(&PIDy);
-				
-				PidFlag=false;
-			}
-			
-			sprintf(txdata,"%f, %f\r\n",Xfiltered,Yfiltered); // Fill up the buffer we're gonna send to PC
-		  HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-			
-			read_touch_cal(&X_touch, &Y_touch); // Read ADC
-			X_touch_last=X_touch;
-			Y_touch_last=Y_touch;
-		//}*/
 		
     /* USER CODE END WHILE */
 

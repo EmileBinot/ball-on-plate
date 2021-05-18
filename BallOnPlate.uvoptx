@@ -153,27 +153,17 @@
         <Ww>
           <count>0</count>
           <WinNumber>1</WinNumber>
-          <ItemText>PIDcount,0x0A</ItemText>
+          <ItemText>filtered</ItemText>
         </Ww>
         <Ww>
           <count>1</count>
           <WinNumber>1</WinNumber>
-          <ItemText>statex</ItemText>
+          <ItemText>abgfiltxlast</ItemText>
         </Ww>
         <Ww>
           <count>2</count>
           <WinNumber>1</WinNumber>
-          <ItemText>statey</ItemText>
-        </Ww>
-        <Ww>
-          <count>3</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>X_touch</ItemText>
-        </Ww>
-        <Ww>
-          <count>4</count>
-          <WinNumber>1</WinNumber>
-          <ItemText>Y_touch</ItemText>
+          <ItemText>abgfiltx</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>
