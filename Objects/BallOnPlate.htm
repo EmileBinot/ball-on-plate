@@ -3,11 +3,11 @@
 <title>Static Call Graph - [.\Objects\BallOnPlate.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\BallOnPlate.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6160001: Last Updated: Tue May 18 09:55:05 2021
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6160001: Last Updated: Tue May 18 10:12:28 2021
 <BR><P>
-<H3>Maximum Stack Usage =        744 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
+<H3>Maximum Stack Usage =        712 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
-__rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
+__rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterY &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 <P>
 <H3>
 Functions with no stack information
@@ -408,8 +408,8 @@ Global Symbols
 <P><STRONG><a name="[16b]"></a>__rt_entry_postsh_1</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, __rtentry2.o(.ARM.Collect$$rtentry$$00000009))
 
 <P><STRONG><a name="[97]"></a>__rt_entry_main</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, __rtentry2.o(.ARM.Collect$$rtentry$$0000000D))
-<BR><BR>[Stack]<UL><LI>Max Depth = 744 + Unknown Stack Size
-<LI>Call Chain = __rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
+<BR><BR>[Stack]<UL><LI>Max Depth = 712 + Unknown Stack Size
+<LI>Call Chain = __rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterY &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[98]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 <LI><a href="#[99]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;exit
@@ -1101,8 +1101,8 @@ Global Symbols
 
 <P><STRONG><a name="[17b]"></a>__semihosting_library_function</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, indicate_semi.o(.text), UNUSED)
 
-<P><STRONG><a name="[c0]"></a>ADCfilterX</STRONG> (Thumb, 1392 bytes, Stack size 232 bytes, main.o(.text.ADCfilterX))
-<BR><BR>[Stack]<UL><LI>Max Depth = 488<LI>Call Chain = ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
+<P><STRONG><a name="[c0]"></a>ADCfilterX</STRONG> (Thumb, 1256 bytes, Stack size 200 bytes, main.o(.text.ADCfilterX))
+<BR><BR>[Stack]<UL><LI>Max Depth = 456<LI>Call Chain = ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[c5]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__hardfp_pow
 <LI><a href="#[c3]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__aeabi_dmul
@@ -1115,7 +1115,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[111]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_touch_cal
 </UL>
 
-<P><STRONG><a name="[c8]"></a>ADCfilterY</STRONG> (Thumb, 1144 bytes, Stack size 200 bytes, main.o(.text.ADCfilterY))
+<P><STRONG><a name="[c8]"></a>ADCfilterY</STRONG> (Thumb, 1152 bytes, Stack size 200 bytes, main.o(.text.ADCfilterY))
 <BR><BR>[Stack]<UL><LI>Max Depth = 456<LI>Call Chain = ADCfilterY &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[c5]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;__hardfp_pow
@@ -1577,8 +1577,8 @@ Global Symbols
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f446xx.o(RESET)
 </UL>
 <P><STRONG><a name="[98]"></a>main</STRONG> (Thumb, 884 bytes, Stack size 136 bytes, main.o(.text.main))
-<BR><BR>[Stack]<UL><LI>Max Depth = 744 + Unknown Stack Size
-<LI>Call Chain = main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
+<BR><BR>[Stack]<UL><LI>Max Depth = 712 + Unknown Stack Size
+<LI>Call Chain = main &rArr; read_touch_cal &rArr; ADCfilterY &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[111]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_touch_cal
 <LI><a href="#[10d]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;Touch_Init
@@ -1631,7 +1631,7 @@ Global Symbols
 </UL>
 
 <P><STRONG><a name="[111]"></a>read_touch_cal</STRONG> (Thumb, 696 bytes, Stack size 120 bytes, main.o(.text.read_touch_cal))
-<BR><BR>[Stack]<UL><LI>Max Depth = 608<LI>Call Chain = read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
+<BR><BR>[Stack]<UL><LI>Max Depth = 576<LI>Call Chain = read_touch_cal &rArr; ADCfilterY &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[118]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_touchY
 <LI><a href="#[116]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_touchX

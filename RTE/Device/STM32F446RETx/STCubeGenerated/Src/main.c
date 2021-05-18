@@ -675,15 +675,9 @@ double ADCfilterX(double current,double last){
       abgfiltvx=abgfiltvx+(b/dt)*rk;
       abgfiltax=abgfiltax+(g/dt)*rk;
 		}
-		unfiltered=abgfiltx;
-		//LP FILTER
-		filtered=alpha*abgfiltxlast+(1-alpha)*abgfiltxlast;
-		
 		abgfiltxlast = abgfiltx;
 		abgfiltvxlast = abgfiltvx;
 		abgfiltaxlast = abgfiltax;
-		
-
 	}
 	else{
 		LPfilter=false;
@@ -695,12 +689,8 @@ double ADCfilterX(double current,double last){
 		
 		last=current;
 	}
-
 	
-	
-	rkglobal=rk;
-
-	return filtered;
+	return abgfiltx;
 }
 
 
@@ -775,6 +765,9 @@ double ADCfilterY(double current,double last){
       abgfiltvy=abgfiltvy+(b/dt)*rk;
       abgfiltay=abgfiltay+(g/dt)*rk;
 		}
+		abgfiltylast = abgfilty;
+		abgfiltvylast = abgfiltvy;
+		abgfiltaylast = abgfiltay;
 	}
 	else{
 		LPfilter=false;
@@ -784,11 +777,7 @@ double ADCfilterY(double current,double last){
 		
 		last=current;
 	}
-	//sprintf(txdata,"%f\r\n",(fabs(last-current))); // Fill up the buffer we're gonna send to PC
-	//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-	abgfiltylast = abgfilty;
-	abgfiltvylast = abgfiltvy;
-	abgfiltaylast = abgfiltay;
+	
 	return abgfilty;
 }
 
