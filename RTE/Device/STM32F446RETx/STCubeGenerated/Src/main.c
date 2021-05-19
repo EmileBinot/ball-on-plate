@@ -69,10 +69,9 @@ int statey=0;
 // UART
 char txdata[100];
 
-
 //______________________________________________________________
 // PID
-float SampleTime=0.005;// Will also change the timer IT Arr
+float SampleTime=0.005;// Will also update the timer IT Arr register
 
 float Kpx = 5;  //Kpx = 3;	//Proportional (P)                                                   
 float Kix = 4; //Kix = 2	//Integral (I)                                                     
@@ -108,16 +107,17 @@ static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
 //______________________________________________________________
-// Touchscreen functions prototype
+// Touchscreen functions prototypes
 void Touch_Init(void);
 uint16_t median(int n, uint16_t x[]);
 uint16_t read_touchX(void);
 uint16_t read_touchY(void);
 uint8_t read_touch_cal (float *Xpos, float *Ypos);
 
+//______________________________________________________________
+// Filtering functions prototypes
 float ADCfilterX(float current,float last);
 float ADCfilterY(float current,float last);
-
 float LPfilterX(float current);
 float LPfilterY(float current);
 
@@ -464,10 +464,10 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 
 //______________________________________________________________
-// Timers IT Callback : 
+// Timers full IT Callback :
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	
-	if (htim == &htim6){	//timer 6 full triggers IT then change motor position
+
+	if (htim == &htim6){//check if timer full is timer6
 			PidFlag=true;	
 	}
 }
@@ -586,12 +586,12 @@ uint8_t read_touch_cal (float *Xpos, float *Ypos){
 	static float xmin = 90.0;
 	static float xmax = 939.0;
 	float xm = (xmax - xmin) / 2.0; // x - Center 
-	static float xLength = 182.0; //Width of Touchscreen in mm at 8.0"
+	static float xLength = 182.0; //Width of Touchscreen in mm
 
-	static float ymin = 102.0;    //380.0  
-	static float ymax = 904.0;    //900.0
+	static float ymin = 102.0;      
+	static float ymax = 904.0;    
 	float ym = (ymax - ymin) / 2.0; // y - Center
-	static float yLength = 140.0; //Length of Touchscreen in mm at 8.0"
+	static float yLength = 140.0; //Length of Touchscreen in mm
 
 	float convertX = xLength / (xmax - xmin);   // converts raw x values to mm. found through manual calibration
 	float convertY = yLength / (ymax - ymin);   // converts raw y values to mm. found through manual calibration
@@ -601,51 +601,67 @@ uint8_t read_touch_cal (float *Xpos, float *Ypos){
 	static float lastmesX;
 	static float lastmesY;
 	
+	// Get ADC readings
 	mesX=read_touchX();
 	mesY=read_touchY();
-	unfilteredABG = mesX;
-	unfilteredABG = (unfilteredABG - xmin - xm) * convertX;
+	
+	//unfilteredABG = mesX;
+	//unfilteredABG = (unfilteredABG - xmin - xm) * convertX;
+	
+	// Alpha-Beta-Gamma filtering
 	mesX = ADCfilterX(mesX,lastmesX);
 	mesY = ADCfilterY(mesY,lastmesY);
-	unfilteredLP = mesX;
-	unfilteredLP = (unfilteredLP - xmin - xm) * convertX;
+	
+	//unfilteredLP = mesX;
+	//unfilteredLP = (unfilteredLP - xmin - xm) * convertX;
+	
+	// Low Pass filtering
 	mesX = LPfilterX(mesX);
 	mesY = LPfilterY(mesY);
 	
+	// Convert to values between [-100;100]
 	*Xpos= (mesX - xmin - xm) * convertX;
 	*Ypos= (mesY - ymin - ym) * convertY;
 	
+	// Keep values for later
 	lastmesX=mesX;
 	lastmesY=mesY;
 	
 	return 1;
 }
-//#### Filtering ADC readings ####
+
+
+//______________________________________________________________
+// Definitions of FILTERING FUNCTIONS : 
+//#### ABG filtering ####
 float ADCfilterX(float current,float last){
+	
 	static bool LPfilter=false;
 	static int i=0;
 	static int j=0;
 
-	//LP filter
-	float filtered;
-	
-	float dt=SampleTime;
+	float filtered;				//Not so useful (return value)
+	float dt=SampleTime;	//Not so useful
 
-	//init speed and acceleration to 0
+	// Initial speed and acceleration set to 0
 	static float abgfiltvx=0;
 	static float abgfiltax=0;
 	static float abgfiltvxlast=0;
 	static float abgfiltaxlast=0;
-	//position variables
+	
+	// Position variables
 	static float abgfiltx=0;
-	static float abgfiltxlast=0;	
+	static float abgfiltxlast=0;
+	
+	// Rejected measure threshold value	
 	static float rk=0;
 	
-	if(statex==1){//ball on plate
-			j++;
-			filtered = current;
-			if(current<(80)){
-				i++;
+	// If ball is on plate
+	if(statex==1){
+			j++;									// Increment ballonplate counter 
+			filtered = current;		// No filtering now
+			if(current<(80)){			// Measure<80 means ball no longer on plate
+				i++;								// Increment ballNOTonplate counter
 				if(i>10){
 					statex=0;
 					//re-init
@@ -653,7 +669,6 @@ float ADCfilterX(float current,float last){
 					abgfiltax=0;
 					abgfiltvxlast=0;
 					abgfiltaxlast=0;
-
 					abgfiltx=0;
 					abgfiltxlast=0;	
 					rk=0;
@@ -663,42 +678,41 @@ float ADCfilterX(float current,float last){
 				i=0;
 			}
 	}
-	if(statex==0){//no ball on plate
+	// If ball is not on plate
+	if(statex==0){
 		i=0;
 		j=0;
 		filtered = current;
-		if (current >(80)){//if position different than zero
+		if (current >(80)){		// Measure>80 means ball on plate
 			statex=1;
 		}
 	}
-	if(j>10 && statex==1){
+	
+	if(j>10 && statex==1){	// If ball is on plate since enough time
 		LPfilter=true;
 		
-		//ALPHA-BETA-GAMMA FILTER
+		// Alpha-Beta-Gamma filtering equations
 		abgfiltx = abgfiltxlast+dt*abgfiltvxlast+(pow(dt,2)/2)*abgfiltaxlast;
     abgfiltvx = abgfiltvxlast+dt*abgfiltaxlast;
     abgfiltax = abgfiltvxlast;
 		
-		rk=current-abgfiltx;
+		rk=current-abgfiltx;	// Difference between measure and prediction
 
-		if(rk<-170){
-			//sprintf(txdata,"PROBLEMy\r\n"); // Fill up the buffer we're gonna send to PC
-			//HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-			
-      abgfiltx=abgfiltx;
+		if(rk<-170){						// If difference is too big
+      abgfiltx=abgfiltx;		// Take prediction instead of measure
       abgfiltvx=abgfiltvx;
       abgfiltax=abgfiltax;
 		}
-		else{
-			abgfiltx=abgfiltx+a*rk;
-      abgfiltvx=abgfiltvx+(b/dt)*rk;
-      abgfiltax=abgfiltax+(g/dt)*rk;
+		else {		// Else, filter anyways
+			abgfiltx=abgfiltx+a*rk;					
+      abgfiltvx=abgfiltvx+(b/dt)*rk;	
+      abgfiltax=abgfiltax+(g/dt)*rk;	
 		}
 		abgfiltxlast = abgfiltx;
 		abgfiltvxlast = abgfiltvx;
 		abgfiltaxlast = abgfiltax;
 	}
-	else{
+	else{	//No filtering
 		LPfilter=false;
 		
 		abgfiltx=current;
@@ -711,9 +725,9 @@ float ADCfilterX(float current,float last){
 	
 	return abgfiltx;
 }
-
-
 float ADCfilterY(float current,float last){
+	//Same principle as ADCfilterX(), refer to it for more comments
+	
 	static bool LPfilter=false;
 	static int i=0;
 	static int j=0;
@@ -791,10 +805,9 @@ float ADCfilterY(float current,float last){
 	
 	return abgfilty;
 }
-
-
-
+//#### Low-Pass Single-Pole IIR Filtering####
 float LPfilterX(float current){
+
 	static float LPfiltered;
 	static float a=0.08;
 
