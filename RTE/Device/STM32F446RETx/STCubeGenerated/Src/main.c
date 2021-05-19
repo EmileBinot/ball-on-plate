@@ -53,38 +53,48 @@ USART_HandleTypeDef husart2;
 //______________________________________________________________
 // Motors
 int flat_X =4500;
-int flat_Y =4750;
+int flat_Y =5000;
+
+
 //______________________________________________________________
 // Touchscreen variables
-double X_touch, Y_touch, X_touch_last, Y_touch_last;
-uint8_t nbrValuesMedian =20;
-double unfiltered;
+float X_touch, Y_touch, X_touch_last, Y_touch_last;
+float unfilteredLP;
+float unfilteredABG;
+
+int statex=0;
+int statey=0;
 
 //______________________________________________________________
 // UART
 char txdata[100];
+
+
 //______________________________________________________________
 // PID
-double SampleTime=0.005;// Will also change the timer IT Arr
+float SampleTime=0.005;// Will also change the timer IT Arr
 
-float Kpx = 4;  //Kpx = 3;	//Proportional (P)                                                   
-float Kix = 3; //Kix = 2	//Integral (I)                                                     
-float Kdx = 1.2;  //Kdx = 1.1;	//Derivative (D)
+float Kpx = 5;  //Kpx = 3;	//Proportional (P)                                                   
+float Kix = 4; //Kix = 2	//Integral (I)                                                     
+float Kdx = 1.9;  //Kdx = 1.1;	//Derivative (D)
 
 float Kpy = 4;  //Kpy = 3;                                                       
 float Kiy = 3;  //Kiy = 2;                                                      
-float Kdy = 0.8;  //Kdy = 1.1;
+float Kdy = 1.5;  //Kdy = 1.1;
 
 PIDControl PIDx;
 PIDControl PIDy;
 
 bool PidFlag=false;
 int PIDcount=0;
-int pidxval;
-double rkglobal;
 
-int statex=0;
-int statey=0;
+//______________________________________________________________
+// FILTERS
+float a=0.5;
+float b=0.03;
+float g=1;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -103,10 +113,13 @@ void Touch_Init(void);
 uint16_t median(int n, uint16_t x[]);
 uint16_t read_touchX(void);
 uint16_t read_touchY(void);
-uint8_t read_touch_cal (double *Xpos, double *Ypos);
+uint8_t read_touch_cal (float *Xpos, float *Ypos);
 
-double ADCfilterX(double current,double last);
-double ADCfilterY(double current,double last);
+float ADCfilterX(float current,float last);
+float ADCfilterY(float current,float last);
+
+float LPfilterX(float current);
+float LPfilterY(float current);
 
 /* USER CODE END PFP */
 
@@ -122,7 +135,8 @@ double ADCfilterY(double current,double last);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	int STABLE=0;
+	int stablecount=0;
+	int stable=0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -143,8 +157,8 @@ int main(void)
   Touch_Init();
 	
 	// PID init
-	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime*12,-1000,+1000,AUTOMATIC,DIRECT);
-	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime*12,-1000,+1000,AUTOMATIC,REVERSE);
+	PIDInit(&PIDx,Kpx,Kix,Kdx,SampleTime*8,-1000,+1000,AUTOMATIC,DIRECT);
+	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime*8,-1000,+1000,AUTOMATIC,REVERSE);
 	PIDSetpointSet(&PIDx,0.0);
 	PIDSetpointSet(&PIDy,0.0);
   /* USER CODE END SysInit */
@@ -162,7 +176,10 @@ int main(void)
 	TIM4->CCR2=flat_Y; // Make Plate flat in Y-Direction (V1)
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
 	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
-	HAL_Delay(2000);
+	HAL_Delay(500);
+	TIM4->CCR1=flat_X-150;
+	TIM4->CCR2=flat_Y+150;
+	HAL_Delay(500);
 	
 	// Start Compute/Position update IT
 	HAL_TIM_Base_Start_IT(&htim6);// Starting motor position update timer IT
@@ -173,7 +190,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		
 		if(PidFlag==true){
 			read_touch_cal(&X_touch, &Y_touch);	
 			PIDcount++;
@@ -181,46 +197,50 @@ int main(void)
 			X_touch_last=X_touch;
 			Y_touch_last=Y_touch;
 			
-			if((PIDcount>12)/* && (STABLE<80)*/ &&((statex==1) || (statey==1))){//BALL ON PLATE && PID TIMER READY
+			if((PIDcount>8) &&((statex==1) || (statey==1))){//BALL ON PLATE && PID TIMER READY
+				
 				PIDcount=0;
 				
-				sprintf(txdata,"%f, %f\r\n",X_touch,Y_touch); // Fill up the buffer we're gonna send to PC
+				sprintf(txdata,"%f, %f, stable=%d\r\n",X_touch,Y_touch,stable); // Fill up the buffer we're gonna send to PC
 				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
 				
-				PidFlag=false;
-				PIDcount=0;
+				if(stable==0){
+					PidFlag=false;
+					PIDcount=0;
+					
+					PIDInputSet(&PIDx,X_touch);
+					PIDInputSet(&PIDy,Y_touch);
 				
-				PIDInputSet(&PIDx,X_touch);
-				PIDInputSet(&PIDy,Y_touch);
-			
-				PIDCompute(&PIDx);
-				PIDCompute(&PIDy);
-				
-				pidxval=(int)PIDOutputGet(&PIDx);
-				
-				TIM4->CCR1=flat_X-250+(int)PIDOutputGet(&PIDx);
-				TIM4->CCR2=flat_Y+250+(int)PIDOutputGet(&PIDy);
-				
-				/*if((X_touch>-20) && (X_touch<20) && (Y_touch>-15) && (Y_touch<15)){
-					STABLE++;
-				}*/
-			}
-			/*if(STABLE>=80){
-				sprintf(txdata,"STABLE\r\n"); // Fill up the buffer we're gonna send to PC
-				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
-				if((X_touch<-20) || (X_touch>20) || (Y_touch<-15) || (Y_touch>15)){
-					STABLE--;
+					PIDCompute(&PIDx);
+					PIDCompute(&PIDy);
+					
+					TIM4->CCR1=flat_X-150+(int)PIDOutputGet(&PIDx);
+					TIM4->CCR2=flat_Y+150+(int)PIDOutputGet(&PIDy);
+				}
+				if(stable==1){
 					TIM4->CCR1=flat_X;
 					TIM4->CCR2=flat_Y;
 				}
-			}
-			if((X_touch<-30) || (X_touch>30) || (Y_touch<-25) || (Y_touch>25)){
-					STABLE=0;
-			}*/
-			
+				
+				
+				if(stable==0){
+					if((X_touch<20 && X_touch>-20)&&(Y_touch<20 && Y_touch>-20)){
+						stablecount++;
+						if(stablecount>20){
+							stable=1;
+						}
+					}
+				}
 
+				if(stable==1){
+					if((X_touch>15 || X_touch<-15)||(Y_touch>15 || Y_touch<-15)){
+						stablecount=0;
+						stable=0;
+					}
+				}
+
+			}
 		}
-		
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -441,8 +461,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	
 	if (htim == &htim6){	//timer 6 full triggers IT then change motor position
 			PidFlag=true;	
-			//sprintf(txdata,"prod\r\n"); // Fill up the buffer we're gonna send to PC
-		  //HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
 	}
 }
 
@@ -471,7 +489,7 @@ void Touch_Init(void){
 	  //turn ADC1 on and set EOCS to regular conversion
 	  ADC1->CR2 |= ADC_CR2_ADON |  ADC_CR2_EOCS;
 	  //set shortest sample time
-	  ADC1->SMPR1 |= 0x09;
+	  ADC1->SMPR1 |= 0x11;
 	  //set resution to 10 bit
 	  ADC1->CR1 = (ADC1->CR1 & ~(ADC_CR1_RES)) | ADC_CR1_RES_0;
 }
@@ -555,37 +573,36 @@ uint16_t read_touchY(void){
 	return med;
 }
 //#### Formatting read values ####
-uint8_t read_touch_cal (double *Xpos, double *Ypos){
+uint8_t read_touch_cal (float *Xpos, float *Ypos){
 	
-	static double xmin = 90.0;
-	static double xmax = 939.0;
-	double xm = (xmax - xmin) / 2.0; // x - Center 
-	static double xLength = 182.0; //Width of Touchscreen in mm at 8.0"
+	static float xmin = 90.0;
+	static float xmax = 939.0;
+	float xm = (xmax - xmin) / 2.0; // x - Center 
+	static float xLength = 182.0; //Width of Touchscreen in mm at 8.0"
 
-	static double ymin = 102.0;    //380.0  
-	static double ymax = 904.0;    //900.0
-	double ym = (ymax - ymin) / 2.0; // y - Center
-	static double yLength = 140.0; //Length of Touchscreen in mm at 8.0"
+	static float ymin = 102.0;    //380.0  
+	static float ymax = 904.0;    //900.0
+	float ym = (ymax - ymin) / 2.0; // y - Center
+	static float yLength = 140.0; //Length of Touchscreen in mm at 8.0"
 
-	double convertX = xLength / (xmax - xmin);   // converts raw x values to mm. found through manual calibration
-	double convertY = yLength / (ymax - ymin);   // converts raw y values to mm. found through manual calibration
+	float convertX = xLength / (xmax - xmin);   // converts raw x values to mm. found through manual calibration
+	float convertY = yLength / (ymax - ymin);   // converts raw y values to mm. found through manual calibration
 	
-	static double mesX;
-	static double mesY;
-	static double lastmesX;
-	static double lastmesY;
+	static float mesX;
+	static float mesY;
+	static float lastmesX;
+	static float lastmesY;
 	
 	mesX=read_touchX();
 	mesY=read_touchY();
-	
-
-	//unfiltered = (mesY - xmin - xm) * convertY;
-	
+	unfilteredABG = mesX;
+	unfilteredABG = (unfilteredABG - xmin - xm) * convertX;
 	mesX = ADCfilterX(mesX,lastmesX);
 	mesY = ADCfilterY(mesY,lastmesY);
-	unfiltered = (unfiltered - xmin - xm) * convertX;
-	//*Xpos=mesX;
-	//*Ypos=mesY;
+	unfilteredLP = mesX;
+	unfilteredLP = (unfilteredLP - xmin - xm) * convertX;
+	mesX = LPfilterX(mesX);
+	mesY = LPfilterY(mesY);
 	
 	*Xpos= (mesX - xmin - xm) * convertX;
 	*Ypos= (mesY - ymin - ym) * convertY;
@@ -596,31 +613,25 @@ uint8_t read_touch_cal (double *Xpos, double *Ypos){
 	return 1;
 }
 //#### Filtering ADC readings ####
-double ADCfilterX(double current,double last){
+float ADCfilterX(float current,float last){
 	static bool LPfilter=false;
 	static int i=0;
-
 	static int j=0;
 
 	//LP filter
-	double filtered;
-	double alpha = 0.001;
+	float filtered;
 	
-	//-------------ABG filter
-	double a=0.5;
-	double b=0.03;
-	double g=1;
-	double dt=SampleTime;
+	float dt=SampleTime;
 
 	//init speed and acceleration to 0
-	static double abgfiltvx=0;
-	static double abgfiltax=0;
-	static double abgfiltvxlast=0;
-	static double abgfiltaxlast=0;
+	static float abgfiltvx=0;
+	static float abgfiltax=0;
+	static float abgfiltvxlast=0;
+	static float abgfiltaxlast=0;
 	//position variables
-	static double abgfiltx=0;
-	static double abgfiltxlast=0;	
-	static double rk=0;
+	static float abgfiltx=0;
+	static float abgfiltxlast=0;	
+	static float rk=0;
 	
 	if(statex==1){//ball on plate
 			j++;
@@ -694,32 +705,24 @@ double ADCfilterX(double current,double last){
 }
 
 
-double ADCfilterY(double current,double last){
+float ADCfilterY(float current,float last){
 	static bool LPfilter=false;
 	static int i=0;
 	static int j=0;
 
-	//LP filter
-	double filtered;
-	static double lastfiltered;
-	double alpha = 0.3;
-	double gain = .5;
-	
-	//-------------ABG filter
-	double a=0.5;
-	double b=0.03;
-	double g=1;
-	double dt=SampleTime;
+	float filtered;
+
+	float dt=SampleTime;
 
 	//init speed and acceleration to 0
-	static double abgfiltvy=0;
-	static double abgfiltay=0;
-	static double abgfiltvylast=0;
-	static double abgfiltaylast=0;
+	static float abgfiltvy=0;
+	static float abgfiltay=0;
+	static float abgfiltvylast=0;
+	static float abgfiltaylast=0;
 	//position variables
-	static double abgfilty=0;
-	static double abgfiltylast=0;	
-	static double rk=0;
+	static float abgfilty=0;
+	static float abgfiltylast=0;	
+	static float rk=0;
 	
 	if(statey==1){//ball on plate
 			j++;
@@ -781,6 +784,25 @@ double ADCfilterY(double current,double last){
 	return abgfilty;
 }
 
+
+
+float LPfilterX(float current){
+	static float LPfiltered;
+	static float a=0.08;
+
+	LPfiltered=a*current+(1-a)*LPfiltered;
+	
+	return LPfiltered;
+}
+
+float LPfilterY(float current){
+	static float LPfiltered;
+	static float a=0.1;
+
+	LPfiltered=a*current+(1-a)*LPfiltered;
+	
+	return LPfiltered;
+}
 /* USER CODE END 4 */
 
 /**
