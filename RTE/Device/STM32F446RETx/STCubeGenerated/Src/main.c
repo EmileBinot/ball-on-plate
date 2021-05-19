@@ -135,8 +135,10 @@ float LPfilterY(float current);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	int stablecount=0;
-	int stable=0;
+	
+	int stablecount=0;	//stablecount will increment everytime ball is in center of the plate
+	int stable=0;				//stable is either 1 or 0, means either stable or not
+	
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -161,6 +163,7 @@ int main(void)
 	PIDInit(&PIDy,Kpy,Kiy,Kdy,SampleTime*8,-1000,+1000,AUTOMATIC,REVERSE);
 	PIDSetpointSet(&PIDx,0.0);
 	PIDSetpointSet(&PIDy,0.0);
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -172,10 +175,11 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 	// Starting motor's PWMs
-	TIM4->CCR1=flat_X; 	// Make Plate flat in X-Direction (V1)
-	TIM4->CCR2=flat_Y; // Make Plate flat in Y-Direction (V1)
-	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1); // Starting motor's PWMs
-	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2); // Starting motor's PWMs
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_1);
+	HAL_TIM_PWM_Start(&htim4,TIM_CHANNEL_2);
+	
+	TIM4->CCR1=flat_X; 	// Make Plate flat in X-Direction
+	TIM4->CCR2=flat_Y; 	// Make Plate flat in Y-Direction
 	HAL_Delay(500);
 	TIM4->CCR1=flat_X-150;
 	TIM4->CCR2=flat_Y+150;
@@ -190,52 +194,56 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-		if(PidFlag==true){
-			read_touch_cal(&X_touch, &Y_touch);	
-			PIDcount++;
+		if(PidFlag==true){		//PidFlag is updated in HAL_TIM_PeriodElapsedCallback() interruption
+			read_touch_cal(&X_touch, &Y_touch);
+			PIDcount++;					//Increment PIDcount counter 
 			
 			X_touch_last=X_touch;
 			Y_touch_last=Y_touch;
 			
-			if((PIDcount>8) &&((statex==1) || (statey==1))){//BALL ON PLATE && PID TIMER READY
+			// When PID count > 8 = 8x5ms = 40ms && ball is on plate :
+			if((PIDcount>8) &&((statex==1) || (statey==1))){
 				
-				PIDcount=0;
+				PIDcount=0;				// Reset PIDcount counter
 				
-				sprintf(txdata,"%f, %f, stable=%d\r\n",X_touch,Y_touch,stable); // Fill up the buffer we're gonna send to PC
-				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY); // Send buffer via USART
+				//Fill up the buffer we're gonna send to PC, then send it via USART2
+				sprintf(txdata,"%f, %f, %f\r\n",X_touch,unfilteredLP,unfilteredABG);
+				HAL_USART_Transmit(&husart2,(uint8_t*)txdata,strlen(txdata),HAL_MAX_DELAY);
 				
-				if(stable==0){
-					PidFlag=false;
-					PIDcount=0;
+				if(stable==0){		// If ball is not stabilised
+					PidFlag=false;	// Reset PIDFlag
+					PIDcount=0;			// Reset PIDcount
 					
-					PIDInputSet(&PIDx,X_touch);
-					PIDInputSet(&PIDy,Y_touch);
+					PIDInputSet(&PIDx,X_touch);			// Update PIDx->input
+					PIDInputSet(&PIDy,Y_touch);			// Update PIDy->input
 				
-					PIDCompute(&PIDx);
-					PIDCompute(&PIDy);
+					PIDCompute(&PIDx);			// Computes P,I,D values then update PIDx->output
+					PIDCompute(&PIDy);			// Computes P,I,D values then update PIDy->output
 					
-					TIM4->CCR1=flat_X-150+(int)PIDOutputGet(&PIDx);
-					TIM4->CCR2=flat_Y+150+(int)PIDOutputGet(&PIDy);
+					TIM4->CCR1=flat_X-150+(int)PIDOutputGet(&PIDx);		//Update X motor position
+					TIM4->CCR2=flat_Y+150+(int)PIDOutputGet(&PIDy);		//Update Y motor position
 				}
-				if(stable==1){
-					TIM4->CCR1=flat_X;
-					TIM4->CCR2=flat_Y;
+				if(stable==1){					// If ball is stabilised on setpoint
+					TIM4->CCR1=flat_X;		// Make Plate flat in X-Direction
+					TIM4->CCR2=flat_Y;		// Make Plate flat in Y-Direction
 				}
 				
-				
+				// if ball is not stabilised:
 				if(stable==0){
+					// if ball is in the center of the plate
 					if((X_touch<20 && X_touch>-20)&&(Y_touch<20 && Y_touch>-20)){
-						stablecount++;
-						if(stablecount>20){
-							stable=1;
+						stablecount++;			// Increment stablecount
+						if(stablecount>20){	// If ball has been in the center of the board enough time
+							stable=1;					// Stable flag switch to 1 (stable)
 						}
 					}
 				}
-
+				// if ball is stabilised:
 				if(stable==1){
+					// if ball goes out of the center of the plate
 					if((X_touch>15 || X_touch<-15)||(Y_touch>15 || Y_touch<-15)){
-						stablecount=0;
-						stable=0;
+						stablecount=0; 			// Stablecount reset
+						stable=0;						// Stable flag switch to 0 (unstable)
 					}
 				}
 

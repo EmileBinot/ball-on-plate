@@ -3619,11 +3619,11 @@
       <ActiveTab>0</ActiveTab>
       <Doc>
         <Name>.\RTE\Device\STM32F446RETx\STCubeGenerated\Src\main.c</Name>
-        <ColumnNumber>31</ColumnNumber>
-        <TopLine>63</TopLine>
-        <CurrentLine>229</CurrentLine>
+        <ColumnNumber>34</ColumnNumber>
+        <TopLine>186</TopLine>
+        <CurrentLine>204</CurrentLine>
         <Folding>1</Folding>
-        <ContractedFolders>255,301,364,402,436,459,471,497,516,546,575,615,812</ContractedFolders>
+        <ContractedFolders>255,301,364,402,436,459,471,497,516,546,575,615,707,812</ContractedFolders>
         <PaneID>0</PaneID>
       </Doc>
       <Doc>

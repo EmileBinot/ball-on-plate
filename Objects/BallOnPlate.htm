@@ -3,9 +3,9 @@
 <title>Static Call Graph - [.\Objects\BallOnPlate.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image .\Objects\BallOnPlate.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6160001: Last Updated: Wed May 19 11:27:06 2021
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6160001: Last Updated: Wed May 19 16:41:16 2021
 <BR><P>
-<H3>Maximum Stack Usage =        536 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
+<H3>Maximum Stack Usage =        544 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
 __rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 <P>
@@ -408,7 +408,7 @@ Global Symbols
 <P><STRONG><a name="[163]"></a>__rt_entry_postsh_1</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, __rtentry2.o(.ARM.Collect$$rtentry$$00000009))
 
 <P><STRONG><a name="[97]"></a>__rt_entry_main</STRONG> (Thumb, 0 bytes, Stack size unknown bytes, __rtentry2.o(.ARM.Collect$$rtentry$$0000000D))
-<BR><BR>[Stack]<UL><LI>Max Depth = 536 + Unknown Stack Size
+<BR><BR>[Stack]<UL><LI>Max Depth = 544 + Unknown Stack Size
 <LI>Call Chain = __rt_entry_main &rArr; main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[98]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
@@ -1586,8 +1586,8 @@ Global Symbols
 <P><STRONG><a name="[5]"></a>UsageFault_Handler</STRONG> (Thumb, 4 bytes, Stack size 0 bytes, stm32f4xx_it.o(.text.UsageFault_Handler))
 <BR>[Address Reference Count : 1]<UL><LI> startup_stm32f446xx.o(RESET)
 </UL>
-<P><STRONG><a name="[98]"></a>main</STRONG> (Thumb, 1136 bytes, Stack size 136 bytes, main.o(.text.main))
-<BR><BR>[Stack]<UL><LI>Max Depth = 536 + Unknown Stack Size
+<P><STRONG><a name="[98]"></a>main</STRONG> (Thumb, 1164 bytes, Stack size 144 bytes, main.o(.text.main))
+<BR><BR>[Stack]<UL><LI>Max Depth = 544 + Unknown Stack Size
 <LI>Call Chain = main &rArr; read_touch_cal &rArr; ADCfilterX &rArr; __hardfp_pow &rArr; sqrt &rArr; _dsqrt &rArr; __fpl_dnaninf
 </UL>
 <BR>[Calls]<UL><LI><a href="#[10e]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;read_touch_cal
